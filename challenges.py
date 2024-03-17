@@ -13,12 +13,12 @@ def prisoners_list(lst):
 
 def check_for_contraband(belongings):
     blocklist = {"knife", "drugs", "weapons", "cellphone", "alcohol"}
-    contraband = [item for item in belongings if item in blocklist]
+    contraband = [item for item in belongings if item.lower() in blocklist]
     return (not contraband, contraband)
 
-def hop_hop(n):
+def hop(n):
     # n == 1 also being a base case saves us from checking whether hop_hop(n - 2) is valid
-    return 1 if n < 2 else hop_hop(n - 1) + hop_hop(n - 2)
+    return 1 if n < 2 else hop(n - 1) + hop(n - 2)
 
 def survival_points(dict1, dict2):
     # a list constructed from a dictionary contains keys
@@ -39,7 +39,8 @@ def display_schedule():
 # end setup
 
 def add_visitor(slot, visitor_name):
-    visitors[slot] = visitors[slot] or visitor_name
+    if slot in visitors and not visitors[slot]:
+        visitors[slot] = visitor_name
     display_schedule()
 
 # setup for acquaintance
