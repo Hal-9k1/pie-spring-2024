@@ -1,0 +1,9 @@
+if [ -d /d ]; then
+  if [ ! -d tmp ]; then
+    mkdir tmp
+  fi
+  py preprocessor.py main.py > tmp/test.py
+  cp tmp/test.py /d/test.py
+else
+  echo "$0: nothing mounted on /d." # echo to stderr
+fi
