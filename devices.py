@@ -2,14 +2,12 @@ import math
 
 class Motor:
     """Wraps a KoalaBear-controlled motor."""
-    __slots__ = "_controller", "_motor", "_robot", "_debug_logger", "_is_inverted"
     def __init__(self, robot, debug_logger, controller_id, motor):
         self._controller = controller_id
         self._motor = motor
         self._robot = robot
         self._debug_logger = debug_logger
         self._is_inverted = False
-    
     def set_invert(self, invert):
         self._set("invert", invert)
         self._is_inverted = invert
@@ -38,23 +36,23 @@ class Motor:
         return self._get("enc") * (-1 if self._is_inverted else 1)
     def reset_encoder(self):
         self._set("enc", 0)
-    
     def _set(self, key, value):
-        self._robot.set_value(self._controller, key + "_" + self._motor, value)
+        self._robot.set_value(self._controller, f"{key}_{self._motor}", value)
     def _get(self, key):
-        return self._robot.get_value(self._controller, key + "_" + self._motor)
+        return self._robot.get_value(self._controller, f"{key}_{self._motor}")
     
 class MotorPair(Motor):
-    __slots__ = "_paired_motor"
     def __init__(self, robot, debug_logger, controller_id, motor_suffix,
-        paired_controller_id, paired_motor_suffix):
+        paired_controller_id, paired_motor_suffix, paired_motor_inverted):
         super().__init__(robot, debug_logger, controller_id, motor_suffix)
         self._paired_motor = Motor(robot, debug_logger, paired_controller_id,
-            paired_motor_suffix) #.set_invert(True)
+            paired_motor_suffix).set_invert(paired_motor_inverted)
+        self._inverted = False
     def set_invert(self, invert):
-        super().set_invert(invert)
-        #self._paired_motor.set_invert(not invert)
-        self._paired_motor.set_invert(invert)
+        if invert != self._inverted:
+            self._inverted = invert
+            super().set_invert(not self._get("invert"))
+            self._paired_motor.set_invert(not self._paired_motor.get("invert"))
         return self
     def set_deadband(deadband):
         super().set_deadband(self, deadband)
@@ -65,13 +63,24 @@ class MotorPair(Motor):
         self._paired_motor.set_pid(p, i, d)
         return self
     def set_velocity(self, velocity):
-        #self._debug_logger.print(f"MotorPair velocity: {velocity}")
         super().set_velocity(velocity)
         self._paired_motor.set_velocity(velocity)
         return self
 
+class Wheel:
+    """Encapsulates a Motor attached to a wheel that can calculate distance travelled given the
+    motor's ticks per rotation and the wheel's radius."""
+    def __init__(self, debug_logger, motor, radius, ticks_per_rotation):
+        self._motor = motor
+        self._radius = radius
+        self._ticks_per_rot = ticks_per_rotation
+        self._debug_logger = debug_logger
+    def get_distance(self):
+        return self._motor.get_encoder() / self._ticks_per_rot * 2 * math.pi * self._radius
+    def set_velocity(self, velocity):
+        self._motor.set_velocity(velocity)
+
 class Servo:
-    __slots__ = "_controller", "_servo", "_robot"
     def __init__(self, robot, controller, servo):
         self._controller = controller
         self._servo = servo

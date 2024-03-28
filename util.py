@@ -1,15 +1,9 @@
-class Vector2: # defining these because I'm not sure what PIE's verdict is on named tuples
-    __slots__ = "x", "y"
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
 class LRStruct:
     __slots__ = "left", "right"
     def __init__(self, left, right):
         self.left = left
         self.right = right
 class DebugLogger:
-    __slots__ = "_default_interval", "_tick", "_printed_tags"
     def __init__(self, default_interval):
         self._default_interval = default_interval
         self._tick = 0

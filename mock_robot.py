@@ -1,7 +1,6 @@
 import time
 
 class MockRobot:
-    __slots__ = "_debug_logger", "_devices", "_max_devices", "_device_types", "_device_counts"
     _default_device_properties = {
         "koalabear": {
             "velocity_a": 0.0,
