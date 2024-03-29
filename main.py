@@ -10,12 +10,58 @@ DRIVE_WHEEL_SPAN = 0.258
 DRIVE_WHEEL_RADIUS = util.inches_to_meters(4)
 
 debug_logger = util.DebugLogger(default_interval=1)
+robot = None
+drive_wheel_left = None
+drive_wheel_right = None
+
+def linear_move(dist):
+    init_dist = 0
+    def linear_move_action(setup):
+        nonlocal init_dist
+        if setup:
+            init_dist = drive_wheel_left.get_distance()
+            #print(f"linear_move_action init_dist = {init_dist}")
+            drive_wheel_left.set_velocity(math.copysign(1, dist))
+            drive_wheel_right.set_velocity(math.copysign(1, dist))
+        else:
+            delta_dist = drive_wheel_left.get_distance() - init_dist
+            #debug_logger.print(f"linear_move_action delta_dist = {delta_dist}")
+            return dist * delta_dist >= 0 and abs(delta_dist) > abs(dist)
+    return linear_move_action
+def turn(ccw_angle):
+    init_dist = 0
+    goal_dist = ccw_angle * DRIVE_WHEEL_SPAN / 2
+    print(goal_dist)
+    def turn_action(setup):
+        nonlocal init_dist
+        if setup:
+            init_dist = drive_wheel_right.get_distance()
+            #print(f"turn_action init_dist = {init_dist} goal_dist = {goal_dist}")
+            drive_wheel_left.set_velocity(-math.copysign(1, goal_dist))
+            drive_wheel_right.set_velocity(math.copysign(1, goal_dist))
+        else:
+            delta_dist = drive_wheel_right.get_distance() - init_dist
+            #debug_logger.print(f"turn_action delta_dist = {delta_dist}")
+            return goal_dist * delta_dist >= 0 and abs(delta_dist) > abs(goal_dist)
+    return turn_action
+def nop(is_done):
+    def nop_action(setup):
+        return is_done
+    return nop_action
+def halt():
+    def halt_action(setup):
+        if setup:
+            drive_wheel_left.set_velocity(0)
+            drive_wheel_right.set_velocity(0)
+        return True
+    return halt_action
 
 actions = []
 
 def autonomous_setup():
+    global drive_wheel_left
+    global drive_wheel_right
     robot = mock_robot.MockRobot(debug_logger, {"koalabear": 1, "servocontroller": 0})
-    #robot = Robot
     drive_wheel_left = devices.Wheel(
         debug_logger,
         devices.Motor(robot, debug_logger, "6_16799360815822931500", "a")
@@ -33,47 +79,6 @@ def autonomous_setup():
         DRIVE_MOTOR_TPR * DRIVE_MOTOR_RATIO * HUB_TO_WHEEL_GEAR_RATIO
         )
 
-    def linear_move(dist):
-        init_dist = 0
-        def linear_move_action(setup):
-            nonlocal init_dist
-            if setup:
-                init_dist = drive_wheel_left.get_distance()
-                #print(f"linear_move_action init_dist = {init_dist}")
-                drive_wheel_left.set_velocity(math.copysign(1, dist))
-                drive_wheel_right.set_velocity(math.copysign(1, dist))
-            else:
-                delta_dist = drive_wheel_left.get_distance() - init_dist
-                #debug_logger.print(f"linear_move_action delta_dist = {delta_dist}")
-                return dist * delta_dist >= 0 and abs(delta_dist) > abs(dist)
-        return linear_move_action
-    def turn(ccw_angle):
-        init_dist = 0
-        goal_dist = ccw_angle * DRIVE_WHEEL_SPAN / 2
-        print(goal_dist)
-        def turn_action(setup):
-            nonlocal init_dist
-            if setup:
-                init_dist = drive_wheel_right.get_distance()
-                #print(f"turn_action init_dist = {init_dist} goal_dist = {goal_dist}")
-                drive_wheel_left.set_velocity(-math.copysign(1, goal_dist))
-                drive_wheel_right.set_velocity(math.copysign(1, goal_dist))
-            else:
-                delta_dist = drive_wheel_right.get_distance() - init_dist
-                #debug_logger.print(f"turn_action delta_dist = {delta_dist}")
-                return goal_dist * delta_dist >= 0 and abs(delta_dist) > abs(goal_dist)
-        return turn_action
-    def nop(is_done):
-        def nop_action(setup):
-            return is_done
-        return nop_action
-    def halt():
-        def halt_action(setup):
-            if setup:
-                drive_wheel_left.set_velocity(0)
-                drive_wheel_right.set_velocity(0)
-            return True
-        return halt_action
     actions.append(nop(True))
     for _ in range(4):
         actions.append(linear_move(1))
