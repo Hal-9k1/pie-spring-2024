@@ -76,8 +76,29 @@ class Wheel:
         self._ticks_per_rot = ticks_per_rotation
         self._debug_logger = debug_logger
     def get_distance(self):
+        """Interpreting the motor as being attached to a wheel, converts the encoder readout of the
+        motor to a distance traveled by the wheel."""
         return self._motor.get_encoder() / self._ticks_per_rot * 2 * math.pi * self._radius
     def set_velocity(self, velocity):
+        """Sets the velocity of the underlying motor."""
+        self._motor.set_velocity(velocity)
+
+class Arm:
+    """Alternatively uses these variables to calculate the height of an arm attached to the
+    motor."""
+    def __init__(self, debug_logger, motor, radius, ticks_per_rotation, max_angle):
+        self._motor = motor
+        self._radius = radius
+        self._ticks_per_rot = ticks_per_rotation
+        self._debug_logger = debug_logger
+        self._max_angle = max_angle
+    def get_height(self):
+        """Interpreting the motor as being attached to an arm, converts the encoder readout of the
+        motor to the vertical position of the arm's tip relative to the motor."""
+        return (math.sin(self._motor.get_encoder() / self._ticks_per_rot * 2 * math.pi)
+            * self._radius)
+    def set_velocity(self, velocity):
+        """Sets the velocity of the underlying motor."""
         self._motor.set_velocity(velocity)
 
 class Servo:
