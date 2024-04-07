@@ -148,9 +148,12 @@ def drive_turn_teleop_main():
     drive_wheel_left.set_velocity(left_velocity / max_abs_velocity)
     drive_wheel_right.set_velocity(right_velocity / max_abs_velocity)
 def arm_teleop_main():
-    arm_velocity = ((1 if Gamepad.get_value("r_bumper") else 0)
+    arm_vel_dir = ((1 if Gamepad.get_value("r_bumper") else 0)
         - (1 if Gamepad.get_value("r_trigger") else 0))
-    arm.set_velocity(arm_velocity)
+    arm_pos = arm.get_normalized_position()
+    # 1 / (x^2 - 2x + 5/2) + 1/3
+    arm.set_velocity(arm_vel_dir * arm.is_velocity_safe(arm_vel_dir)
+        / (arm_pos * (arm_pos - 2) + 5/2) + 1/3)
 def teleop_main():
     tank_drive_teleop_main()
     #drive_turn_teleop_main()

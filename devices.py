@@ -34,6 +34,8 @@ class Motor:
         return self._get("velocity")
     def get_encoder(self):
         return self._get("enc") * (-1 if self._is_inverted else 1)
+    def get_angle(self, ticks_per_rot):
+        return self._motor.get_encoder() / ticks_per_rot * 2 * math.pi
     def reset_encoder(self):
         self._set("enc", 0)
     def _set(self, key, value):
@@ -78,28 +80,44 @@ class Wheel:
     def get_distance(self):
         """Interpreting the motor as being attached to a wheel, converts the encoder readout of the
         motor to a distance traveled by the wheel."""
-        return self._motor.get_encoder() / self._ticks_per_rot * 2 * math.pi * self._radius
+        return self._motor.get_angle(self._ticks_per_rot) * self._radius
     def set_velocity(self, velocity):
         """Sets the velocity of the underlying motor."""
         self._motor.set_velocity(velocity)
 
 class Arm:
-    """Alternatively uses these variables to calculate the height of an arm attached to the
-    motor."""
-    def __init__(self, debug_logger, motor, radius, ticks_per_rotation, max_angle):
+    """Encapsulates a Motor attached to an arm that can calculate the height of the arm's end
+    relative to the motor and detect out-of-bounds movement given the motor's ticks per rotation,
+    the arm's length, and the maximum angle."""
+    def __init__(self, debug_logger, motor, length, ticks_per_rotation, max_angle):
         self._motor = motor
-        self._radius = radius
+        self._length = length
         self._ticks_per_rot = ticks_per_rotation
         self._debug_logger = debug_logger
         self._max_angle = max_angle
     def get_height(self):
         """Interpreting the motor as being attached to an arm, converts the encoder readout of the
         motor to the vertical position of the arm's tip relative to the motor."""
-        return (math.sin(self._motor.get_encoder() / self._ticks_per_rot * 2 * math.pi)
-            * self._radius)
+        return math.sin(self._motor.get_angle(self._ticks_per_rot)) * self._length
     def set_velocity(self, velocity):
         """Sets the velocity of the underlying motor."""
         self._motor.set_velocity(velocity)
+    def get_normalized_position(self):
+        """Returns a number in the range [0, 1] where 0 is linearly mapped to an encoder position of
+        0 and 1 is linearly mapped to the encoder position corrosponding to the arm's maximum
+        angle."""
+        return self._motor.get_angle(self._ticks_per_rot) / self._max_angle
+    def is_velocity_safe(self, velocity):
+        """Checks if the arm is currently within its defined safe bounds. If in of bounds, returns
+        True. Otherwise returns whether the given velocity is in the right direction to return the
+        arm to its safe bounds."""
+        angle = self._motor.get_angle(self._ticks_per_rot)
+        if angle > self._max_angle:
+            return velocity < 0
+        elif angle < 0:
+            return velocity > 0
+        else:
+            return True
 
 class Servo:
     def __init__(self, robot, controller, servo):
