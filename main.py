@@ -1,14 +1,15 @@
 import devices
 import math
 import mock_robot
+import time
 import util
 
 HUB_TO_WHEEL_GEAR_RATIO = 84 / 36
-DRIVE_MOTOR_RATIO = 30
+DRIVE_MOTOR_RATIO = 70
 DRIVE_MOTOR_TPR = 64
 DRIVE_WHEEL_SPAN = 0.258
-DRIVE_WHEEL_RADIUS = util.inches_to_meters(4)
-ARM_MOTOR_RATIO = 30
+DRIVE_WHEEL_RADIUS = util.inches_to_meters(2)
+ARM_MOTOR_RATIO = 70
 ARM_MOTOR_TPR = 64
 ARM_LENGTH = util.inches_to_meters(14)
 
@@ -68,6 +69,15 @@ def nop(is_done):
     def nop_action(setup):
         return is_done
     return nop_action
+def sleep(duration_ms):
+    start = 0
+    def sleep_action(setup):
+        nonlocal start
+        if setup:
+            start = time.time()
+        else:
+            return ((time.time() - start) * 1000) >= duration_ms
+    return sleep_action
 def halt():
     def halt_action(setup):
         if setup:
@@ -86,12 +96,12 @@ def initialize():
     global arm
     if not initialized:
         initialized = True
-        #robot = mock_robot.MockRobot(debug_logger, {"koalabear": 1, "servocontroller": 0})
+        #robot = mock_robot.MockRobot(debug_logger, {"koalabear": 2, "servocontroller": 0})
         robot = Robot
         drive_wheel_left = devices.Wheel(
             debug_logger,
             devices.Motor(robot, debug_logger, "6_10833107448071795766", "b")
-                .set_invert(True)
+                .set_invert(False)
                 .set_pid(None, None, None),
             DRIVE_WHEEL_RADIUS,
             DRIVE_MOTOR_TPR * DRIVE_MOTOR_RATIO * HUB_TO_WHEEL_GEAR_RATIO
@@ -99,7 +109,7 @@ def initialize():
         drive_wheel_right = devices.Wheel(
             debug_logger,
             devices.Motor(robot, debug_logger, "6_10833107448071795766", "a")
-                .set_invert(False)
+                .set_invert(True)
                 .set_pid(None, None, None),
             DRIVE_WHEEL_RADIUS,
             DRIVE_MOTOR_TPR * DRIVE_MOTOR_RATIO * HUB_TO_WHEEL_GEAR_RATIO
@@ -123,7 +133,10 @@ def autonomous_setup():
     #    actions.append(arm_height((ARM_HEIGHT / 2) if up else 0))
     #    actions.append(turn(-math.pi / 2))
     #actions.append(halt())
-    actions.append(linear_move(1))
+    #actions.append(linear_move(1))
+    #actions.append(halt())
+    #actions.append(sleep(500))
+    actions.append(turn(-math.pi / 2))
     actions.append(halt())
 def autonomous_main():
     if actions and actions[0](False):

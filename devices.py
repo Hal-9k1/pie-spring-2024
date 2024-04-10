@@ -35,7 +35,7 @@ class Motor:
     def get_encoder(self):
         return self._get("enc") * (-1 if self._is_inverted else 1)
     def get_angle(self, ticks_per_rot):
-        return self._motor.get_encoder() / ticks_per_rot * 2 * math.pi
+        return self.get_encoder() / ticks_per_rot * 2 * math.pi
     def reset_encoder(self):
         self._set("enc", 0)
     def _set(self, key, value):
