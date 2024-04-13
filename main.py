@@ -11,6 +11,8 @@ DRIVE_WHEEL_SPAN = 0.258
 DRIVE_WHEEL_RADIUS = util.inches_to_meters(2)
 ARM_MOTOR_RATIO = 70
 ARM_MOTOR_TPR = 64
+ARM_MOTOR_RATIO = 70
+ARM_MOTOR_TPR = 64
 ARM_LENGTH = util.inches_to_meters(14)
 
 debug_logger = util.DebugLogger(default_interval=2000)
@@ -123,6 +125,14 @@ def initialize():
             ARM_MOTOR_TPR * ARM_MOTOR_RATIO,
             math.pi / 2
             )
+        hand = devices.Hand(
+            debug_logger,
+            devices.Motor(robot, debug_logger, "HAND CONTROLLER ID HERE", "MOTOR")
+                .set_invert(False)
+                .set_pid(None, None, None),
+            HAND_MOTOR_TPR * HAND_MOTOR_RATIO,
+            math.pi / 2
+            )
 def autonomous_setup():
     initialize()
     actions.append(nop(True))
@@ -133,9 +143,9 @@ def autonomous_setup():
     #    actions.append(arm_height((ARM_HEIGHT / 2) if up else 0))
     #    actions.append(turn(-math.pi / 2))
     #actions.append(halt())
-    #actions.append(linear_move(1))
-    #actions.append(halt())
-    #actions.append(sleep(500))
+    actions.append(linear_move(1))
+    actions.append(halt())
+    actions.append(sleep(500))
     actions.append(turn(-math.pi / 2))
     actions.append(halt())
 def autonomous_main():

@@ -119,6 +119,27 @@ class Arm:
         else:
             return True
 
+class Hand:
+    def __init__(self, debug_logger, motor, ticks_per_rotation, max_angle):
+        self._debug_logger = debug_logger
+        self._motor = motor
+        self._ticks_per_rot = ticks_per_rotation
+        self._open_angle = max_angle
+        self._close_angle = 0
+        self._state = False
+        self._finished = True
+    def set_state(self, state):
+        self._state = state
+        self._motor.set_velocity(1 if state else -1)
+        self._finished = False
+    def tick(self):
+        if not self._finished:
+            angle = self._motor.get_angle(self._ticks_per_rot)
+            if (self._state and angle > self._open_angle) or angle < self._close_angle:
+                self._finished = True
+                self._motor.set_velocity(0)
+                return True
+        return False
 class Servo:
     def __init__(self, robot, controller, servo):
         self._controller = controller
