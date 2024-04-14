@@ -4,9 +4,9 @@ import mock_robot
 import robot_executor
 import util
 
-HUB_TO_WHEEL_GEAR_RATIO = 84 / 36
+HUB_TO_WHEEL_GEAR_RATIO = 84 / 36 # gear further from motor / gear closer to motor
 DRIVE_MOTOR_RATIO = 70
-DRIVE_MOTOR_TPR = 16 # "hey isn't this supposed to be 64" IT DOESN'T WORK WITH 64
+DRIVE_MOTOR_TPR = 16 # ticks per rev. "hey isn't this supposed to be 64" IT DOESN'T WORK WITH 64
 DRIVE_WHEEL_SPAN = 0.258
 DRIVE_WHEEL_RADIUS = util.inches_to_meters(2)
 HUB_TO_ARM_GEAR_RATIO = 84 / 36
@@ -18,30 +18,34 @@ HAND_MOTOR_RATIO = 70
 HAND_MOTOR_TPR = 16
 USE_MOCK_ROBOT = False
 
-debug_logger = util.DebugLogger(default_interval=1)
+debug_logger = util.DebugLogger(default_interval=2000)
 initialized = False
+is_dawn_environment = None
 robot = None
 drive_wheel_left = None
 drive_wheel_right = None
 arm = None
 hand = None
-hand_toggled = False
+l_bumper_edge = None
 
 def initialize():
-    global initialized
-    global robot
-    global drive_wheel_left
-    global drive_wheel_right
-    global arm
-    global hand
-    global executor
+    global initialized, robot, drive_wheel_left, drive_wheel_right, arm, hand, executor
+    global is_dawn_environment
     if not initialized:
         initialized = True
+        try:
+            Robot
+        except NameError:
+            is_dawn_environment = False
+        else:
+            is_dawn_environment = True
+        if not is_dawn_environment and not USE_MOCK_ROBOT:
+            print("No Robot detected; forcing USE_MOCK_ROBOT.")
         robot = (mock_robot.MockRobot(debug_logger, {"koalabear": 2, "servocontroller": 0}, 5000)
-            if USE_MOCK_ROBOT else Robot)
+            if USE_MOCK_ROBOT or not is_dawn_environment else Robot)
         drive_wheel_left = devices.Wheel(
             debug_logger,
-            devices.Motor(robot, debug_logger, "6_10833107448071795766", "a") # maybe swap + invert both
+            devices.Motor(robot, debug_logger, "6_10833107448071795766", "a")
                 .set_invert(False)
                 .set_pid(None, None, None),
             DRIVE_WHEEL_RADIUS,
@@ -72,35 +76,32 @@ def initialize():
             HAND_MOTOR_TPR * HAND_MOTOR_RATIO * HUB_TO_HAND_GEAR_RATIO,
             math.pi * 80 / 180,
             math.pi / 36,
-            start_open = True
+            True
             )
         executor = robot_executor.ActionExecutor(debug_logger, robot, DRIVE_WHEEL_SPAN,
             drive_wheel_left, drive_wheel_right, arm, hand)
+@_PREP_ENTRY_POINT
 def autonomous_setup():
     initialize()
-    executor.nop(True)
     #up = False
     #for _ in range(4):
     #    actions.append(linear_move(1))
     #    up = not up
     #    executor.arm_height((ARM_HEIGHT / 2) if up else 0)
+    #    executor.toggle_hand()
     #    executor.turn(-math.pi / 2)
-    #executor.halt()
-    #executor.linear_move(1)
-    #executor.halt()
-    #executor.toggle_hand()
-    #executor.sleep(500)
-    #executor.turn(-math.pi / 2)
-    #executor.halt()
-    #executor.linear_move(DRIVE_WHEEL_RADIUS * 2 * math.pi)
-    executor.turn(-math.pi / 2)
+    executor.linear_move(DRIVE_WHEEL_RADIUS * 2 * math.pi)
     executor.halt()
     executor.status()
+@_PREP_ENTRY_POINT
 def autonomous_main():
     executor.tick()
     debug_logger.tick()
+@_PREP_ENTRY_POINT
 def teleop_setup():
+    global l_bumper_edge
     initialize()
+    l_bumper_edge = util.FlagEdgeDetector(lambda: Gamepad.get_value("l_bumper"))
 def tank_drive_teleop_main():
     # down is positive on the logitech gamepads for REASONS
     drive_wheel_left.set_velocity(-Gamepad.get_value("joystick_left_y"))
@@ -123,12 +124,10 @@ def arm_teleop_main():
     #    / (arm_pos * (arm_pos - 2) + 5/2) + 1/3))
     arm.set_velocity(arm_vel_dir * arm.is_velocity_safe(arm_vel_dir))
 def hand_teleop_main():
-    global hand_toggled
-    bumper_down = Gamepad.get_value("l_bumper")
-    if not hand_toggled and bumper_down:
+    if l_bumper_edge.test():
         hand.toggle_state()
-    hand_toggled = bumper_down
     hand.tick()
+@_PREP_ENTRY_POINT
 def teleop_main():
     tank_drive_teleop_main()
     #drive_turn_teleop_main()

@@ -95,10 +95,11 @@ class Arm:
         self._ticks_per_rot = ticks_per_rotation
         self._debug_logger = debug_logger
         self._max_angle = max_angle
+        self._zero_angle = motor.get_angle(self._ticks_per_rot)
     def get_height(self):
         """Interpreting the motor as being attached to an arm, converts the encoder readout of the
         motor to the vertical position of the arm's tip relative to the motor."""
-        return math.sin(self._motor.get_angle(self._ticks_per_rot)) * self._length
+        return math.sin(self._get_angle()) * self._length
     def set_velocity(self, velocity):
         """Sets the velocity of the underlying motor."""
         self._motor.set_velocity(velocity)
@@ -106,18 +107,20 @@ class Arm:
         """Returns a number in the range [0, 1] where 0 is linearly mapped to an encoder position of
         0 and 1 is linearly mapped to the encoder position corrosponding to the arm's maximum
         angle."""
-        return self._motor.get_angle(self._ticks_per_rot) / self._max_angle
+        return self._get_angle() / self._max_angle
     def is_velocity_safe(self, velocity):
         """Checks if the arm is currently within its defined safe bounds. If in of bounds, returns
         True. Otherwise returns whether the given velocity is in the right direction to return the
         arm to its safe bounds."""
-        angle = self._motor.get_angle(self._ticks_per_rot)
+        angle = self._get_angle()
         if angle > self._max_angle:
             return velocity < 0
         elif angle < 0:
             return velocity > 0
         else:
             return True
+    def _get_angle(self):
+        return self._motor.get_angle(self._ticks_per_rot) - self._zero_angle
 
 class Hand:
     def __init__(self, debug_logger, motor, ticks_per_rotation, max_angle, buffer_angle,

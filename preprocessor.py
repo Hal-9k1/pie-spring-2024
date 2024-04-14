@@ -8,7 +8,8 @@ class ModuleInfo:
         self.func_call = func_call
         self.body_text = body
 
-def process_file(file_path, indent=" " * 4, module_name=None, module_list=None, import_cursor=0):
+def process_file(file_path, indent=" " * 4, module_name=None, module_list=None, import_cursor=0,
+        auto_detect_entry_points=True):
     """Preprocesses a python script by recursively transcluding imported files."""
     # if not top level, returns the script without import statements
     if not os.path.exists(file_path):
@@ -94,8 +95,11 @@ def process_file(file_path, indent=" " * 4, module_name=None, module_list=None, 
                 if not prev_imported_module:
                     module_list.insert(import_cursor, ModuleInfo(imported_module_name, func_call,
                         "\n".join(imported_module_buffer)))
+            elif not auto_detect_entry_points and words[0] == "@_PREP_ENTRY_POINT":
+                module_buffer.append(line[:line.find("@")] + "@_HELPER_entry_point\n")
+                entry_point_line_nums.append(len(module_buffer))
             else:
-                if words[0] == "def" and is_top_level:
+                if auto_detect_entry_points and words[0] == "def" and is_top_level:
                     module_buffer.append(line[:line.find("d")] + "@_HELPER_entry_point\n")
                     entry_point_line_nums.append(len(module_buffer))
                 module_buffer.append(line)
@@ -162,4 +166,6 @@ def process_file(file_path, indent=" " * 4, module_name=None, module_list=None, 
             return "".join(module_buffer)
 
 if __name__ == "__main__":
-    print(process_file(sys.argv[1]))
+    print(process_file(sys.argv[1],
+        auto_detect_entry_points="--auto-detect-entry-points" in sys.argv)
+        )

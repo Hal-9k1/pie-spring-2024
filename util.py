@@ -26,5 +26,16 @@ class DebugLogger:
     def reset_print_tag(self, tag):
         if tag in self._printed_tags:
             del self._printed_tags[tag]
+class FlagEdgeDetector:
+    def __init__(self, func, initial_state = False):
+        self._func = func
+        self._state = initial_state
+    def test(self):
+        result = False
+        flag = self._func()
+        if not self._state and flag:
+            result = True
+        self._state = flag
+        return result
 def inches_to_meters(inches):
     return inches / 39.3700787

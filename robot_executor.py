@@ -11,18 +11,20 @@ class ActionExecutor:
         self._arm = arm
         self._hand = hand
         self._actions = []
+        self.nop()
     def linear_move(self, dist):
         init_dist = 0
         def linear_move_action(setup):
             nonlocal init_dist
             if setup:
                 init_dist = self._drive_wheel_left.get_distance()
-                #print(f"linear_move_action init_dist = {init_dist}")
                 self._drive_wheel_left.set_velocity(math.copysign(1, dist))
                 self._drive_wheel_right.set_velocity(math.copysign(1, dist))
             else:
                 delta_dist = self._drive_wheel_left.get_distance() - init_dist
-                #debug_logger.print(f"linear_move_action delta_dist = {delta_dist}")
+                speed = min(1, abs(delta_dist - dist) / 2 + 0.25) # slow down to 75% within 0.5m
+                self._drive_wheel_left.set_velocity(math.copysign(speed, dist))
+                self._drive_wheel_right.set_velocity(math.copysign(speed, dist))
                 return dist * delta_dist >= 0 and abs(delta_dist) > abs(dist)
         self._actions.append(linear_move_action)
     def turn(self, ccw_angle):
@@ -33,12 +35,10 @@ class ActionExecutor:
             nonlocal init_dist
             if setup:
                 init_dist = self._drive_wheel_right.get_distance()
-                #print(f"turn_action init_dist = {init_dist} goal_dist = {goal_dist}")
                 self._drive_wheel_left.set_velocity(-math.copysign(1, goal_dist))
                 self._drive_wheel_right.set_velocity(math.copysign(1, goal_dist))
             else:
                 delta_dist = self._drive_wheel_right.get_distance() - init_dist
-                #debug_logger.print(f"turn_action delta_dist = {delta_dist}")
                 return goal_dist * delta_dist >= 0 and abs(delta_dist) > abs(goal_dist)
         self._actions.append(turn_action)
     def arm_height(self, height):
@@ -63,9 +63,9 @@ class ActionExecutor:
             else:
                 return self._hand.tick()
         self._actions.append(toggle_hand_action)
-    def nop(self, is_done):
+    def nop(self):
         def nop_action(setup):
-            return is_done
+            return True
         self._actions.append(nop_action)
     def sleep(self, duration_ms):
         start = 0
