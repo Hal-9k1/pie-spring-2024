@@ -1,94 +1,31 @@
 import devices
 import math
 import mock_robot
-import time
+import robot_executor
 import util
 
 HUB_TO_WHEEL_GEAR_RATIO = 84 / 36
 DRIVE_MOTOR_RATIO = 70
-DRIVE_MOTOR_TPR = 64
+DRIVE_MOTOR_TPR = 16 # "hey isn't this supposed to be 64" IT DOESN'T WORK WITH 64
 DRIVE_WHEEL_SPAN = 0.258
 DRIVE_WHEEL_RADIUS = util.inches_to_meters(2)
+HUB_TO_ARM_GEAR_RATIO = 84 / 36
 ARM_MOTOR_RATIO = 70
-ARM_MOTOR_TPR = 64
-ARM_MOTOR_RATIO = 70
-ARM_MOTOR_TPR = 64
-ARM_LENGTH = util.inches_to_meters(14)
+ARM_MOTOR_TPR = 16
+ARM_LENGTH = util.inches_to_meters(10.5)
+HUB_TO_HAND_GEAR_RATIO = 36 / 12
+HAND_MOTOR_RATIO = 70
+HAND_MOTOR_TPR = 16
+USE_MOCK_ROBOT = False
 
-debug_logger = util.DebugLogger(default_interval=2000)
+debug_logger = util.DebugLogger(default_interval=1)
 initialized = False
 robot = None
 drive_wheel_left = None
 drive_wheel_right = None
 arm = None
-
-def linear_move(dist):
-    init_dist = 0
-    def linear_move_action(setup):
-        nonlocal init_dist
-        if setup:
-            init_dist = drive_wheel_left.get_distance()
-            #print(f"linear_move_action init_dist = {init_dist}")
-            drive_wheel_left.set_velocity(math.copysign(1, dist))
-            drive_wheel_right.set_velocity(math.copysign(1, dist))
-        else:
-            delta_dist = drive_wheel_left.get_distance() - init_dist
-            #debug_logger.print(f"linear_move_action delta_dist = {delta_dist}")
-            return dist * delta_dist >= 0 and abs(delta_dist) > abs(dist)
-    return linear_move_action
-def turn(ccw_angle):
-    init_dist = 0
-    goal_dist = ccw_angle * DRIVE_WHEEL_SPAN / 2
-    print(goal_dist)
-    def turn_action(setup):
-        nonlocal init_dist
-        if setup:
-            init_dist = drive_wheel_right.get_distance()
-            #print(f"turn_action init_dist = {init_dist} goal_dist = {goal_dist}")
-            drive_wheel_left.set_velocity(-math.copysign(1, goal_dist))
-            drive_wheel_right.set_velocity(math.copysign(1, goal_dist))
-        else:
-            delta_dist = drive_wheel_right.get_distance() - init_dist
-            #debug_logger.print(f"turn_action delta_dist = {delta_dist}")
-            return goal_dist * delta_dist >= 0 and abs(delta_dist) > abs(goal_dist)
-    return turn_action
-def arm_height(height):
-    init_height = 0
-    goal_delta_height = 0
-    def arm_height_action(setup):
-        nonlocal init_height
-        nonlocal goal_delta_height
-        if setup:
-            init_height = arm.get_height()
-            goal_delta_height = height - init_height
-            arm.set_velocity(math.copysign(1, delta_height))
-        else:
-            delta_height = arm.get_height() - init_height
-            return (goal_delta_height * delta_height >= 0
-                and abs(delta_height) > abs(goal_delta_height))
-    return arm_height_action
-def nop(is_done):
-    def nop_action(setup):
-        return is_done
-    return nop_action
-def sleep(duration_ms):
-    start = 0
-    def sleep_action(setup):
-        nonlocal start
-        if setup:
-            start = time.time()
-        else:
-            return ((time.time() - start) * 1000) >= duration_ms
-    return sleep_action
-def halt():
-    def halt_action(setup):
-        if setup:
-            drive_wheel_left.set_velocity(0)
-            drive_wheel_right.set_velocity(0)
-        return True
-    return halt_action
-
-actions = []
+hand = None
+hand_toggled = False
 
 def initialize():
     global initialized
@@ -96,13 +33,15 @@ def initialize():
     global drive_wheel_left
     global drive_wheel_right
     global arm
+    global hand
+    global executor
     if not initialized:
         initialized = True
-        #robot = mock_robot.MockRobot(debug_logger, {"koalabear": 2, "servocontroller": 0})
-        robot = Robot
+        robot = (mock_robot.MockRobot(debug_logger, {"koalabear": 2, "servocontroller": 0}, 5000)
+            if USE_MOCK_ROBOT else Robot)
         drive_wheel_left = devices.Wheel(
             debug_logger,
-            devices.Motor(robot, debug_logger, "6_10833107448071795766", "b")
+            devices.Motor(robot, debug_logger, "6_10833107448071795766", "a") # maybe swap + invert both
                 .set_invert(False)
                 .set_pid(None, None, None),
             DRIVE_WHEEL_RADIUS,
@@ -110,7 +49,7 @@ def initialize():
             )
         drive_wheel_right = devices.Wheel(
             debug_logger,
-            devices.Motor(robot, debug_logger, "6_10833107448071795766", "a")
+            devices.Motor(robot, debug_logger, "6_10833107448071795766", "b")
                 .set_invert(True)
                 .set_pid(None, None, None),
             DRIVE_WHEEL_RADIUS,
@@ -119,51 +58,56 @@ def initialize():
         arm = devices.Arm(
             debug_logger,
             devices.Motor(robot, debug_logger, "6_8847060420572259627", "b")
-                .set_invert(False)
+                .set_invert(True)
                 .set_pid(None, None, None),
             ARM_LENGTH,
-            ARM_MOTOR_TPR * ARM_MOTOR_RATIO,
-            math.pi / 2
+            ARM_MOTOR_TPR * ARM_MOTOR_RATIO * HUB_TO_ARM_GEAR_RATIO,
+            math.pi / 6
             )
         hand = devices.Hand(
             debug_logger,
-            devices.Motor(robot, debug_logger, "HAND CONTROLLER ID HERE", "MOTOR")
-                .set_invert(False)
+            devices.Motor(robot, debug_logger, "6_8847060420572259627", "a")
+                .set_invert(True)
                 .set_pid(None, None, None),
-            HAND_MOTOR_TPR * HAND_MOTOR_RATIO,
-            math.pi / 2
+            HAND_MOTOR_TPR * HAND_MOTOR_RATIO * HUB_TO_HAND_GEAR_RATIO,
+            math.pi * 80 / 180,
+            math.pi / 36,
+            start_open = True
             )
+        executor = robot_executor.ActionExecutor(debug_logger, robot, DRIVE_WHEEL_SPAN,
+            drive_wheel_left, drive_wheel_right, arm, hand)
 def autonomous_setup():
     initialize()
-    actions.append(nop(True))
-    up = False
+    executor.nop(True)
+    #up = False
     #for _ in range(4):
     #    actions.append(linear_move(1))
     #    up = not up
-    #    actions.append(arm_height((ARM_HEIGHT / 2) if up else 0))
-    #    actions.append(turn(-math.pi / 2))
-    #actions.append(halt())
-    actions.append(linear_move(1))
-    actions.append(halt())
-    actions.append(sleep(500))
-    actions.append(turn(-math.pi / 2))
-    actions.append(halt())
+    #    executor.arm_height((ARM_HEIGHT / 2) if up else 0)
+    #    executor.turn(-math.pi / 2)
+    #executor.halt()
+    #executor.linear_move(1)
+    #executor.halt()
+    #executor.toggle_hand()
+    #executor.sleep(500)
+    #executor.turn(-math.pi / 2)
+    #executor.halt()
+    #executor.linear_move(DRIVE_WHEEL_RADIUS * 2 * math.pi)
+    executor.turn(-math.pi / 2)
+    executor.halt()
+    executor.status()
 def autonomous_main():
-    if actions and actions[0](False):
-        actions.pop(0)
-        if actions:
-            print("Completed action, setting up next one.")
-            actions[0](True)
-        else:
-            print("Done!")
+    executor.tick()
     debug_logger.tick()
 def teleop_setup():
     initialize()
 def tank_drive_teleop_main():
-    drive_wheel_left.set_velocity(Gamepad.get_value("joystick_left_y"))
-    drive_wheel_right.set_velocity(Gamepad.get_value("joystick_right_y"))
+    # down is positive on the logitech gamepads for REASONS
+    drive_wheel_left.set_velocity(-Gamepad.get_value("joystick_left_y"))
+    drive_wheel_right.set_velocity(-Gamepad.get_value("joystick_right_y"))
 def drive_turn_teleop_main():
-    drive = Gamepad.get_value("joystick_left_y")
+    drive = -Gamepad.get_value("joystick_left_y")
+    # right is positive
     turn = Gamepad.get_value("joystick_right_x")
     left_velocity = drive + turn
     right_velocity = drive - turn
@@ -175,11 +119,19 @@ def arm_teleop_main():
         - (1 if Gamepad.get_value("r_trigger") else 0))
     arm_pos = arm.get_normalized_position()
     # 1 / (x^2 - 2x + 5/2) + 1/3
-    arm.set_velocity(arm_vel_dir * arm.is_velocity_safe(arm_vel_dir)
-        / (arm_pos * (arm_pos - 2) + 5/2) + 1/3)
+    #arm.set_velocity(arm_vel_dir * (arm.is_velocity_safe(arm_vel_dir)
+    #    / (arm_pos * (arm_pos - 2) + 5/2) + 1/3))
+    arm.set_velocity(arm_vel_dir * arm.is_velocity_safe(arm_vel_dir))
+def hand_teleop_main():
+    global hand_toggled
+    bumper_down = Gamepad.get_value("l_bumper")
+    if not hand_toggled and bumper_down:
+        hand.toggle_state()
+    hand_toggled = bumper_down
+    hand.tick()
 def teleop_main():
     tank_drive_teleop_main()
     #drive_turn_teleop_main()
     arm_teleop_main()
+    hand_teleop_main()
     debug_logger.tick()
-

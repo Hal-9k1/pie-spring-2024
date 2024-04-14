@@ -25,14 +25,14 @@ class MockRobot:
             "servo1": 0.0
         }
     }
-    _motor_ticks_per_sec = 2000
-    def __init__(self, debug_logger, max_devices):
+    def __init__(self, debug_logger, max_devices, motor_ticks_per_sec = 2000):
         print("NOTICE: MockRobot instance constructed.")
         self._devices = {}
         self._device_types = {}
         self._max_devices = max_devices
         self._device_counts = {}
         self._debug_logger = debug_logger
+        self._motor_ticks_per_sec = motor_ticks_per_sec
         for device_type in self._default_device_properties:
             self._device_counts[device_type] = 0
     def get_value(self, device_id, value_name):
