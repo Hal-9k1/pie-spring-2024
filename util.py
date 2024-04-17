@@ -1,3 +1,5 @@
+import time
+
 class LRStruct:
     __slots__ = "left", "right"
     def __init__(self, left, right):
@@ -8,8 +10,15 @@ class DebugLogger:
         self._default_interval = default_interval
         self._tick = 0
         self._printed_tags = {}
+        self._time_samples = []
     def tick(self):
         self._tick += 1
+        timestamp = time.time()
+        self._time_samples.append(timestamp)
+        while self._time_samples[0] < timestamp - 1:
+            del self._time_samples[0]
+    def get_ticks_per_second(self):
+        return len(self._time_samples)
     def lazy_print(self, func, interval=None):
         if interval == None:
             interval = self._default_interval
@@ -27,7 +36,7 @@ class DebugLogger:
         if tag in self._printed_tags:
             del self._printed_tags[tag]
 class FlagEdgeDetector:
-    def __init__(self, func, initial_state = False):
+    def __init__(self, func, initial_state=False):
         self._func = func
         self._state = initial_state
     def test(self):

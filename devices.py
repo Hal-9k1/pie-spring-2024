@@ -1,4 +1,5 @@
 import math
+import time
 
 class Motor:
     """Wraps a KoalaBear-controlled motor."""
@@ -42,6 +43,58 @@ class Motor:
         self._robot.set_value(self._controller, f"{key}_{self._motor}", value)
     def _get(self, key):
         return self._robot.get_value(self._controller, f"{key}_{self._motor}")
+
+class PidMotor(Motor):
+    def __init__(self, robot, debug_logger, controller_id, motor):
+        super().__init__(robot, debug_logger, controller_id, motor)
+        super().set_pid(None, None, None)
+        self._clear_samples()
+        self._max_samples = 200
+        self._held_position = None
+        self._last_timestamp = None
+        self._coeffs = None
+    def set_velocity(self, velocity):
+        self._held_position = None # force clear on next hold_position call
+        super().set_velocity(velocity)
+        return self
+    def set_pid(self, p, i, d):
+        if not p and not i and not d:
+            self._coeffs = None
+        else:
+            self._coeffs = (p, i, d)
+        return self
+    def set_position(self, pos):
+        self._clear_samples()
+        self._held_position = pos
+        return self
+    def hold_position(self):
+        if not self._coeffs:
+            raise Exception("PID coefficients not set.")
+        self._record_sample()
+        super().set_velocity(self._calc_proportional(self._held_position)
+            + self._calc_integral(self._held_position) + self._calc_derivative())
+        return self
+    def _record_sample(self):
+        self._enc_samples[self._cur_sample] = self.get_encoder()
+        timestamp = time.time()
+        self._time_samples[self._cur_sample] = timestamp - (self._last_timestamp or 0)
+        self._last_timestamp = timestamp
+        self._cur_sample += 1
+        if self._cur_sample == self._max_samples:
+            self._cur_sample = 0
+    def _clear_samples(self):
+        self._enc_samples = []
+        self._time_samples = []
+        self._cur_sample = 0
+    def _calc_proportional(self):
+        return self._coeffs[0] * (self.get_encoder() - self._held_position)
+    def _calc_integral(self):
+        return self._coeffs[1] * sum((enc - self._held_position) * time for (enc, time)
+            in zip(self._enc_samples, self._time_samples))
+    def _calc_derviative(self):
+        return (self._coeffs[2]
+            * (self._enc_samples[self._cur_sample] - self._enc_samples[self._cur_sample - 1])
+            / (self._time_samples[self._cur_sample] - self._time_samples[self._cur_sample - 1]))
     
 class MotorPair(Motor):
     def __init__(self, robot, debug_logger, controller_id, motor_suffix,
@@ -103,6 +156,11 @@ class Arm:
     def set_velocity(self, velocity):
         """Sets the velocity of the underlying motor."""
         self._motor.set_velocity(velocity)
+        if not velocity:
+            self._motor.set_position(self._motor.get_encoder())
+    def maintain_position(self):
+        if not self._motor.get_velocity():
+            self._motor.hold_position()
     def get_normalized_position(self):
         """Returns a number in the range [0, 1] where 0 is linearly mapped to an encoder position of
         0 and 1 is linearly mapped to the encoder position corrosponding to the arm's maximum
@@ -151,6 +209,7 @@ class Hand:
                 self._motor.set_velocity(0)
                 return True
         return False
+
 class Servo:
     def __init__(self, robot, controller, servo):
         self._controller = controller

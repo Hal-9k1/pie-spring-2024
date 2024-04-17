@@ -61,9 +61,9 @@ def initialize():
             )
         arm = devices.Arm(
             debug_logger,
-            devices.Motor(robot, debug_logger, "6_8847060420572259627", "b")
+            devices.PidMotor(robot, debug_logger, "6_8847060420572259627", "b")
                 .set_invert(True)
-                .set_pid(None, None, None),
+                .set_pid(0.05, 0.035, -0.01),
             ARM_LENGTH,
             ARM_MOTOR_TPR * ARM_MOTOR_RATIO * HUB_TO_ARM_GEAR_RATIO,
             math.pi / 6
@@ -80,6 +80,9 @@ def initialize():
             )
         executor = robot_executor.ActionExecutor(debug_logger, robot, DRIVE_WHEEL_SPAN,
             drive_wheel_left, drive_wheel_right, arm, hand)
+def common_main():
+    debug_logger.tick()
+    debug_logger.print("TPS: " + str(debug_logger.get_ticks_per_second()))
 @_PREP_ENTRY_POINT
 def autonomous_setup():
     initialize()
@@ -96,7 +99,7 @@ def autonomous_setup():
 @_PREP_ENTRY_POINT
 def autonomous_main():
     executor.tick()
-    debug_logger.tick()
+    common_main()
 @_PREP_ENTRY_POINT
 def teleop_setup():
     global l_bumper_edge
@@ -123,6 +126,7 @@ def arm_teleop_main():
     #arm.set_velocity(arm_vel_dir * (arm.is_velocity_safe(arm_vel_dir)
     #    / (arm_pos * (arm_pos - 2) + 5/2) + 1/3))
     arm.set_velocity(arm_vel_dir * arm.is_velocity_safe(arm_vel_dir))
+    arm.maintain_position()
 def hand_teleop_main():
     if l_bumper_edge.test():
         hand.toggle_state()
@@ -133,4 +137,4 @@ def teleop_main():
     #drive_turn_teleop_main()
     arm_teleop_main()
     hand_teleop_main()
-    debug_logger.tick()
+    common_main()
