@@ -155,12 +155,13 @@ class Arm:
         return math.sin(self._get_angle()) * self._length
     def set_velocity(self, velocity):
         """Sets the velocity of the underlying motor."""
+        if not velocity and self._motor.get_velocity():
+            #self._motor.set_position(self._motor.get_encoder())
+            pass
+        elif not velocity:
+            #self._motor.hold_position()
+            pass
         self._motor.set_velocity(velocity)
-        if not velocity:
-            self._motor.set_position(self._motor.get_encoder())
-    def maintain_position(self):
-        if not self._motor.get_velocity():
-            self._motor.hold_position()
     def get_normalized_position(self):
         """Returns a number in the range [0, 1] where 0 is linearly mapped to an encoder position of
         0 and 1 is linearly mapped to the encoder position corrosponding to the arm's maximum
