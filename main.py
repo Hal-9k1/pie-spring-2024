@@ -13,11 +13,15 @@ HUB_TO_ARM_GEAR_RATIO = 84 / 36
 ARM_MOTOR_RATIO = 70
 ARM_MOTOR_TPR = 16
 ARM_LENGTH = util.inches_to_meters(10.5) # meters.
-HUB_TO_HAND_GEAR_RATIO = 36 / 12
+HUB_TO_HAND_GEAR_RATIO = 12 / 36
 HAND_MOTOR_RATIO = 70
 HAND_MOTOR_TPR = 16
+HAND_OPEN_WIDTH = util.inches_to_meters(6.5) # meters.
+HAND_BUFFER_WIDTH = util.inches_to_meters(1.5) # meters.
+HAND_LENGTH = util.inches_to_meters(6) # meters.
+HAND_STRUGGLE_DURATION = 1 # seconds. 0 to disable
 USE_MOCK_ROBOT = False
-ARM_RANGE_LIMIT = math.pi / 3 # radians. 0 to disable
+ARM_RANGE_LIMIT = 0 #math.pi / 3 # radians. 0 to disable
 ARM_USE_EASING = False # only effective with ARM_RANGE_LIMIT
 
 debug_logger = util.DebugLogger(default_interval=2000)
@@ -47,7 +51,7 @@ def initialize():
             if USE_MOCK_ROBOT or not is_dawn_environment else Robot)
         drive_wheel_left = devices.Wheel(
             debug_logger,
-            devices.Motor(robot, debug_logger, "6_8847060420572259627", "a")
+            devices.Motor(robot, debug_logger, "6_5011048539317462848", "a")
                 .set_invert(False)
                 .set_pid(None, None, None),
             DRIVE_WHEEL_RADIUS,
@@ -55,31 +59,32 @@ def initialize():
             )
         drive_wheel_right = devices.Wheel(
             debug_logger,
-            devices.Motor(robot, debug_logger, "6_8847060420572259627", "b")
+            devices.Motor(robot, debug_logger, "6_5011048539317462848", "b")
                 .set_invert(True)
                 .set_pid(None, None, None),
             DRIVE_WHEEL_RADIUS,
             DRIVE_MOTOR_TPR * DRIVE_MOTOR_RATIO * HUB_TO_WHEEL_GEAR_RATIO
             )
-        #arm = devices.Arm(
-        #    debug_logger,
-        #    devices.PidMotor(robot, debug_logger, "6_8847060420572259627", "b")
-        #        .set_invert(True)
-        #        .set_pid(0.05, 0.035, -0.01),
-        #    ARM_LENGTH,
-        #    ARM_MOTOR_TPR * ARM_MOTOR_RATIO * HUB_TO_ARM_GEAR_RATIO,
-        #    ARM_RANGE_LIMIT or math.pi * 2
-        #    )
-        #hand = devices.Hand(
-        #    debug_logger,
-        #    devices.Motor(robot, debug_logger, "6_8847060420572259627", "a")
-        #        .set_invert(True)
-        #        .set_pid(None, None, None),
-        #    HAND_MOTOR_TPR * HAND_MOTOR_RATIO * HUB_TO_HAND_GEAR_RATIO,
-        #    math.pi * 80 / 180,
-        #    math.pi / 36,
-        #    True
-        #    )
+        arm = devices.Arm(
+            debug_logger,
+            devices.PidMotor(robot, debug_logger, "6_6925048702386060390", "b")
+                .set_invert(False)
+                .set_pid(0.05, 0.035, -0.01),
+            ARM_LENGTH,
+            ARM_MOTOR_TPR * ARM_MOTOR_RATIO * HUB_TO_ARM_GEAR_RATIO,
+            ARM_RANGE_LIMIT or math.pi * 2
+            )
+        hand = devices.Hand(
+            debug_logger,
+            devices.Motor(robot, debug_logger, "6_6925048702386060390", "a")
+                .set_invert(True)
+                .set_pid(None, None, None),
+            HAND_MOTOR_TPR * HAND_MOTOR_RATIO * HUB_TO_HAND_GEAR_RATIO,
+            HAND_OPEN_WIDTH,
+            HAND_LENGTH,
+            HAND_STRUGGLE_DURATION,
+            True
+            )
         executor = robot_executor.ActionExecutor(debug_logger, robot, DRIVE_WHEEL_SPAN,
             drive_wheel_left, drive_wheel_right, arm, hand)
 def common_main():
@@ -123,7 +128,7 @@ def drive_turn_teleop_main():
 def arm_teleop_main():
     arm_vel_dir = ((1 if Gamepad.get_value("r_bumper") else 0)
         - (1 if Gamepad.get_value("r_trigger") else 0))
-    debug_logger.print(arm_vel_dir, interval=20000)
+    debug_logger.print(arm_vel_dir, interval=2000)
     arm_pos = arm.get_normalized_position()
     # 1 / (x^2 - 2x + 5/2) + 1/3
     if ARM_RANGE_LIMIT:
@@ -140,8 +145,8 @@ def hand_teleop_main():
     hand.tick()
 @_PREP_ENTRY_POINT
 def teleop_main():
-    tank_drive_teleop_main()
+    #tank_drive_teleop_main()
     drive_turn_teleop_main()
-    #arm_teleop_main()
-    #hand_teleop_main()
+    arm_teleop_main()
+    hand_teleop_main()
     common_main()

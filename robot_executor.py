@@ -22,7 +22,8 @@ class ActionExecutor:
                 self._drive_wheel_right.set_velocity(math.copysign(1, dist))
             else:
                 delta_dist = self._drive_wheel_left.get_distance() - init_dist
-                speed = min(1, abs(delta_dist - dist) / 2 + 0.25) # slow down to 75% within 0.5m
+                # slow down to 75% within 0.5m
+                speed = min(1, abs(delta_dist - dist) / 2 + 0.25) 
                 self._drive_wheel_left.set_velocity(math.copysign(speed, dist))
                 self._drive_wheel_right.set_velocity(math.copysign(speed, dist))
                 return dist * delta_dist >= 0 and abs(delta_dist) > abs(dist)
@@ -50,7 +51,7 @@ class ActionExecutor:
             if setup:
                 init_height = self._arm.get_height()
                 goal_delta_height = height - init_height
-                self._arm.set_velocity(math.copysign(1, delta_height))
+                self._arm.set_velocity(math.copysign(1, goal_delta_height))
             else:
                 delta_height = self._arm.get_height() - init_height
                 return (goal_delta_height * delta_height >= 0

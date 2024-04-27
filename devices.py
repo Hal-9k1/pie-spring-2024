@@ -142,17 +142,19 @@ class Arm:
     """Encapsulates a Motor attached to an arm that can calculate the height of the arm's end
     relative to the motor and detect out-of-bounds movement given the motor's ticks per rotation,
     the arm's length, and the maximum angle."""
-    def __init__(self, debug_logger, motor, length, ticks_per_rotation, max_angle):
+    def __init__(self, debug_logger, motor, length, ticks_per_rotation, max_height):
         self._motor = motor
         self._length = length
         self._ticks_per_rot = ticks_per_rotation
         self._debug_logger = debug_logger
-        self._max_angle = max_angle
-        self._zero_angle = motor.get_angle(self._ticks_per_rot)
+        self._max_height = max_height
+        self._zero_height = 0 # bootstrap for get_height
+        self._zero_height = self.get_height()
     def get_height(self):
         """Interpreting the motor as being attached to an arm, converts the encoder readout of the
         motor to the vertical position of the arm's tip relative to the motor."""
-        return math.sin(self._get_angle()) * self._length
+        return (math.sin(self._motor.get_angle(self._ticks_per_rot)) * self._length
+            - self._zero_height)
     def set_velocity(self, velocity):
         """Sets the velocity of the underlying motor."""
         if not velocity and self._motor.get_velocity():
@@ -166,50 +168,91 @@ class Arm:
         """Returns a number in the range [0, 1] where 0 is linearly mapped to an encoder position of
         0 and 1 is linearly mapped to the encoder position corrosponding to the arm's maximum
         angle."""
-        return self._get_angle() / self._max_angle
+        return self.get_height() / (self._max_height - self._zero_height)
     def is_velocity_safe(self, velocity):
         """Checks if the arm is currently within its defined safe bounds. If in of bounds, returns
         True. Otherwise returns whether the given velocity is in the right direction to return the
         arm to its safe bounds."""
-        angle = self._get_angle()
-        if angle > self._max_angle:
+        height = self.get_height()
+        if height > self._max_height:
             return velocity < 0
-        elif angle < 0:
+        elif height < 0:
             return velocity > 0
         else:
             return True
-    def _get_angle(self):
-        return self._motor.get_angle(self._ticks_per_rot) - self._zero_angle
 
 class Hand:
-    def __init__(self, debug_logger, motor, ticks_per_rotation, max_angle, buffer_angle,
-            start_open = True):
+    _MAX_HISTORY_LENGTH = 40000
+    _STRUGGLE_THRESHOLD = 0.02
+    def __init__(self, debug_logger, motor, ticks_per_rotation, max_width, hand_length,
+            struggle_duration, start_open = True):
+        # disable struggle checking if struggle_duration == 0
         self._debug_logger = debug_logger
         self._motor = motor
         self._ticks_per_rot = ticks_per_rotation
-        init_angle = self._motor.get_angle(self._ticks_per_rot)
+        self._hand_length = hand_length
+        self._struggle_duration = struggle_duration
+        init_width = self._get_width()
         if start_open:
-            self._open_angle = init_angle - buffer_angle
-            self._close_angle = init_angle - max_angle
+            self._open_width = init_width
+            self._close_width = init_width - max_width
         else:
-            self._open_angle = init_angle + max_angle
-            self._close_angle = init_angle + buffer_angle
+            self._open_width = init_width + max_width
+            self._close_width = init_width
         self._state = start_open
+        self._width_history = [(0, None)] * self._MAX_HISTORY_LENGTH
+        self._hist_pos = 0
         self._finished = True
     def toggle_state(self):
         self._state = not self._state
-        self._motor.set_velocity(0.5 if self._state else -0.5)
+        self._motor.set_velocity(self._get_hand_speed() * (1 if self._state else -1))
         self._finished = False
     def tick(self):
         if not self._finished:
-            angle = self._motor.get_angle(self._ticks_per_rot)
-            #print(angle)
-            if (self._state and angle > self._open_angle) or (not self._state and
-                    angle < self._close_angle):
+            width = self._get_width()
+            reached_end = (self._state and width < self._open_width) or (not self._state and
+                width > self._close_width)
+            # don't check if struggle duration is 0
+            if self._struggle_duration:
+                lookbehind = self._get_hist_lookbehind()
+                struggling = (lookbehind and abs(lookbehind - self._get_width())
+                    < self._STRUGGLE_THRESHOLD)
+            else:
+                struggling = False
+            if reached_end or struggling:
                 self._finished = True
                 self._motor.set_velocity(0)
                 return True
         return False
+    def _get_width(self):
+        return math.sin(self._motor.get_angle(self._ticks_per_rot)) * self._hand_length
+    def _get_hand_speed(self):
+        return 0.5
+    def _get_hist_time(self, i):
+        return self._width_history[i * 2]
+    def _get_hist_width(self, i):
+        return self._width_history[i * 2 + 1]
+    def _set_hist_time(self, i, x):
+        self._width_history[i * 2] = x
+    def _set_hist_width(self, i, x):
+        self._width_history[i * 2 + 1] = x
+    def _record_history(self):
+        self._set_hist_time(self._hist_pos, time.time())
+        self._set_hist_width(self._hist_pos, self._get_width())
+        self._hist_pos = (self._hist_pos + 1) % self._MAX_HISTORY_LENGTH
+    def _get_hist_lookbehind(self):
+        min_idx = self._hist_pos
+        max_idx = self._hist_pos + self._MAX_HISTORY_LENGTH - 1
+        goal_time = time.time() - self._struggle_duration
+        while True:
+            mid_idx = math.floor((min_idx + max_idx) / 2)
+            hist_entry = self._width_history[mid_idx % self._MAX_HISTORY_LENGTH]
+            if hist_entry[0] < goal_time:
+                min_idx = mid_idx + 1
+            elif hist_entry[0] > goal_time:
+                max_idx = mid_idx - 1
+            if min_idx == max_idx:
+                return hist_entry[1]
 
 class Servo:
     def __init__(self, robot, controller, servo):

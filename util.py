@@ -11,14 +11,20 @@ class DebugLogger:
         self._tick = 0
         self._printed_tags = {}
         self._time_samples = []
+        self._init_time = time.time()
     def tick(self):
         self._tick += 1
         timestamp = time.time()
         self._time_samples.append(timestamp)
-        while self._time_samples[0] < timestamp - 1:
-            del self._time_samples[0]
+        del_idx = 0
+        for sample in self._time_samples:
+            if sample >= (timestamp - 1):
+                break
+            del_idx += 1
+        if del_idx:
+            del self._time_samples[:del_idx - 1]
     def get_ticks_per_second(self):
-        return len(self._time_samples)
+        return len(self._time_samples) if self._init_time + 1 < time.time() else 0
     def lazy_print(self, func, interval=None):
         if interval == None:
             interval = self._default_interval
