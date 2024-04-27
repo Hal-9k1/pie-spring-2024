@@ -43,49 +43,25 @@ def add_visitor(slot, visitor_name):
         visitors[slot] = visitor_name
     display_schedule()
 
-# setup for acquaintance
-start_time = None
-def count_links(id1, id2, known, visited):
-    import time
-    print(f"counting {id1} to {id2}")
-    if time.time() - start_time > 10:
-        raise Exception("Timed out.")
-    if not id2 in known[id1]:
-        links = 0
-        for id3 in known[id1]:
-            if not id3 in visited:
-                visited.add(id3)
-                links += count_links(id3, id2, known, visited)
-        if links >= 3:
-            # cache the indirect connection between id1 and id2
-            known[id1].add(id2)
-            visited.discard(id1)
-    return 1 if id2 in known[id1] else 0
-# end setup
-
 def acquaintance(id1, id2, *lst):
-    # TODO: 100% sure there is a solution with better running time because known is a graph and
-    # there are a zillion better ways to walk graphs than this
     if id1 == None or id2 == None:
         return False # the spec doesn't say you have to handle this, but the autograder does so wtv
-    import time
-    global start_time
-    start_time = time.time()
-    try:
-        # initially only contains direct neighbors, but will be updated with indirect neighbors
-        # (connected by three or more nodes) to make repeated traversals of the same path faster:
-        known = {}
-        for group in lst:
-            for member in group:
-                # finding neighbors this way causes all(x in known[x] for x in known) but that won't
-                # cause issues for us
-                known.setdefault(member, set()).update(group)
-        print(known)
-        # consider id1 already visited to prevent first invocation calling count_links(id1, id2, [id1])
-        # which would cause the set to be modified while the first invocation is still looping over it
-        return bool(count_links(id1, id2, known, {id1}))
-    except Exception as e:
-        return str(type(e)) + str(e)
+    sets = [set(l) for l in lst]
+    while True:
+        merged = False
+        new_sets = []
+        for s in sets:
+            new_set = s
+            for t in sets:
+                if s != t and len(new_set.intersection(t)) >= 3:
+                    new_set |= t
+                    t.clear()
+                    merged = True
+            new_sets.append(new_set)
+        sets = [s for s in new_sets if s] # remove empty
+        if not merged:
+            break
+    return any(id1 in s and id2 in s for s in sets)
 
 def ssspookyyyy(str):
     # TODO: figure out the weird group theory mathy solution that probably exists
