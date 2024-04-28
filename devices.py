@@ -199,13 +199,14 @@ class Hand:
         self._ticks_per_rot = ticks_per_rotation
         self._hand_length = hand_length
         self._struggle_duration = struggle_duration
-        init_width = self._get_width()
+        init_enc = self._motor.get_encoder()
+        max_enc = math.asin(max_width / 2 / hand_length) / 2 / math.pi * ticks_per_rotation
         if start_open:
-            self._open_width = init_width
-            self._close_width = init_width - max_width
+            self._open_enc = init_enc
+            self._close_enc = init_enc - max_enc
         else:
-            self._open_width = init_width + max_width
-            self._close_width = init_width
+            self._open_enc = init_enc + max_enc
+            self._close_enc = init_enc
         self._state = start_open
         self._width_history = [0, None] * self._MAX_HISTORY_LENGTH
         self._hist_pos = 0
@@ -221,11 +222,11 @@ class Hand:
         """Stops the hand's movement if necessary. Returns whether the hand has just finished
         moving."""
         if not self._finished:
-            width = self._get_width()
-            reached_end = (self._state and width > self._open_width) or (not self._state and
-                width < self._close_width)
-            debug_logger.print(f"hand state {self._state} width {width} open width "
-                f"{self._open_width} close width {self._close_width}")
+            enc = self._motor.get_encoder()
+            reached_end = (self._state and enc > self._open_enc) or (not self._state and
+                enc < self._close_enc)
+            #debug_logger.print(f"hand state {self._state} width {width} open width "
+            #    f"{self._open_width} close width {self._close_width}")
             # don't check if struggle duration is 0
             if self._struggle_duration:
                 lookbehind = self._get_hist_lookbehind()
@@ -234,8 +235,8 @@ class Hand:
             else:
                 struggling = False
             if reached_end or struggling:
-                print(f"Stopping hand. reached_end = {reached_end} width = {width} "
-                    + f"open_width = {self._open_width} close_width = {self._close_width} "
+                print(f"Stopping hand. reached_end = {reached_end} enc = {enc} "
+                    + f"open_enc = {self._open_enc} close_enc = {self._close_enc} "
                     + f"struggling = {struggling} "
                     + f"lookbehind width = {self._struggle_duration and lookbehind}")
                 self._finished = True
@@ -243,7 +244,8 @@ class Hand:
                 return True
         return False
     def _get_width(self):
-        return math.sin(self._motor.get_angle(self._ticks_per_rot)) * self._hand_length * 2
+        angle = (self._motor.get_encoder() - self._init_enc) / self._ticks_per_rot * 2 * math.pi
+        return math.sin(angle) * self._hand_length * 2
     def _get_hand_speed(self):
         return 0.5
     def _get_hist_time(self, i):
