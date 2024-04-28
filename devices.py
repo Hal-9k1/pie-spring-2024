@@ -2,7 +2,7 @@ import math
 import time
 
 class Motor:
-    """Wraps a KoalaBear-controlled motor."""
+    """Wraps a PiE KoalaBear-controlled motor."""
     def __init__(self, robot, debug_logger, controller_id, motor):
         self._controller = controller_id
         self._motor = motor
@@ -45,11 +45,13 @@ class Motor:
         return self._robot.get_value(self._controller, f"{key}_{self._motor}")
 
 class PidMotor(Motor):
+    """Adds custom PID control to a Motor since PiE's implementation is weird."""
     def __init__(self, robot, debug_logger, controller_id, motor):
         super().__init__(robot, debug_logger, controller_id, motor)
         super().set_pid(None, None, None)
         self._clear_samples()
         self._max_samples = 200
+        self._derivative_samples = 20
         self._held_position = None
         self._last_timestamp = None
         self._coeffs = None
@@ -92,11 +94,14 @@ class PidMotor(Motor):
         return self._coeffs[1] * sum((enc - self._held_position) * time for (enc, time)
             in zip(self._enc_samples, self._time_samples))
     def _calc_derviative(self):
-        return (self._coeffs[2]
-            * (self._enc_samples[self._cur_sample] - self._enc_samples[self._cur_sample - 1])
-            / (self._time_samples[self._cur_sample] - self._time_samples[self._cur_sample - 1]))
+        avg_deriv = sum(
+            ((self._enc_samples[self._cur_sample] - self._enc_samples[self._cur_sample - i])
+            / (self._time_samples[self._cur_sample] - self._time_samples[self._cur_sample - i]))
+            for i in range(self._deriv_samples)) / self._deriv_samples
+        return self._coeffs[2] * avg_deriv
     
 class MotorPair(Motor):
+    """Drives a pair of Motors together as if they were one."""
     def __init__(self, robot, debug_logger, controller_id, motor_suffix,
         paired_controller_id, paired_motor_suffix, paired_motor_inverted):
         super().__init__(robot, debug_logger, controller_id, motor_suffix)
@@ -158,7 +163,7 @@ class Arm:
     def set_velocity(self, velocity):
         """Sets the velocity of the underlying motor."""
         if not velocity and self._motor.get_velocity():
-            #self._motor.set_position(self._motor.get_encoder())
+            self._motor.set_position(self._motor.get_encoder())
             pass
         elif not velocity:
             #self._motor.hold_position()
@@ -182,8 +187,10 @@ class Arm:
             return True
 
 class Hand:
+    """A Motor connected to a hand that can toggle its open/closed state given the maximum width
+    and hand length, optionally stopping when encountering resistance."""
     _MAX_HISTORY_LENGTH = 40000
-    _STRUGGLE_THRESHOLD = 0.02
+    _STRUGGLE_THRESHOLD = 0.02 # meters. hand must move this far in struggle_duration seconds.
     def __init__(self, debug_logger, motor, ticks_per_rotation, max_width, hand_length,
             struggle_duration, start_open = True):
         # disable struggle checking if struggle_duration == 0
@@ -200,32 +207,43 @@ class Hand:
             self._open_width = init_width + max_width
             self._close_width = init_width
         self._state = start_open
-        self._width_history = [(0, None)] * self._MAX_HISTORY_LENGTH
+        self._width_history = [0, None] * self._MAX_HISTORY_LENGTH
         self._hist_pos = 0
         self._finished = True
     def toggle_state(self):
+        """Swaps the hand's state between open and closed and starts moving accordingly."""
         self._state = not self._state
+        print("about to toggle state")
         self._motor.set_velocity(self._get_hand_speed() * (1 if self._state else -1))
         self._finished = False
+        print(f"Toggled hand state to {self._state} hand velocity {self._motor.get_velocity()}")
     def tick(self):
+        """Stops the hand's movement if necessary. Returns whether the hand has just finished
+        moving."""
         if not self._finished:
             width = self._get_width()
-            reached_end = (self._state and width < self._open_width) or (not self._state and
-                width > self._close_width)
+            reached_end = (self._state and width > self._open_width) or (not self._state and
+                width < self._close_width)
+            debug_logger.print(f"hand state {self._state} width {width} open width "
+                f"{self._open_width} close width {self._close_width}")
             # don't check if struggle duration is 0
             if self._struggle_duration:
                 lookbehind = self._get_hist_lookbehind()
-                struggling = (lookbehind and abs(lookbehind - self._get_width())
+                struggling = (bool(lookbehind) and abs(lookbehind - self._get_width())
                     < self._STRUGGLE_THRESHOLD)
             else:
                 struggling = False
             if reached_end or struggling:
+                print(f"Stopping hand. reached_end = {reached_end} width = {width} "
+                    + f"open_width = {self._open_width} close_width = {self._close_width} "
+                    + f"struggling = {struggling} "
+                    + f"lookbehind width = {self._struggle_duration and lookbehind}")
                 self._finished = True
                 self._motor.set_velocity(0)
                 return True
         return False
     def _get_width(self):
-        return math.sin(self._motor.get_angle(self._ticks_per_rot)) * self._hand_length
+        return math.sin(self._motor.get_angle(self._ticks_per_rot)) * self._hand_length * 2
     def _get_hand_speed(self):
         return 0.5
     def _get_hist_time(self, i):
@@ -246,15 +264,16 @@ class Hand:
         goal_time = time.time() - self._struggle_duration
         while True:
             mid_idx = math.floor((min_idx + max_idx) / 2)
-            hist_entry = self._width_history[mid_idx % self._MAX_HISTORY_LENGTH]
-            if hist_entry[0] < goal_time:
+            hist_idx = mid_idx % self._MAX_HISTORY_LENGTH
+            if self._get_hist_time(hist_idx) < goal_time:
                 min_idx = mid_idx + 1
-            elif hist_entry[0] > goal_time:
+            elif self._get_hist_time(hist_idx) > goal_time:
                 max_idx = mid_idx - 1
             if min_idx == max_idx:
-                return hist_entry[1]
+                return self._get_hist_width(hist_idx)
 
 class Servo:
+    """Wraps a PiE servo."""
     def __init__(self, robot, controller, servo):
         self._controller = controller
         self._servo = servo

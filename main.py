@@ -13,13 +13,13 @@ HUB_TO_ARM_GEAR_RATIO = 84 / 36
 ARM_MOTOR_RATIO = 70
 ARM_MOTOR_TPR = 16
 ARM_LENGTH = util.inches_to_meters(10.5) # meters.
-HUB_TO_HAND_GEAR_RATIO = 12 / 36
+HUB_TO_HAND_GEAR_RATIO = 28 / 36 # 36 to 48 to 12 to 28. only the first and last matter.
 HAND_MOTOR_RATIO = 70
 HAND_MOTOR_TPR = 16
-HAND_OPEN_WIDTH = util.inches_to_meters(6.5) # meters.
-HAND_BUFFER_WIDTH = util.inches_to_meters(1.5) # meters.
-HAND_LENGTH = util.inches_to_meters(6) # meters.
+HAND_OPEN_WIDTH = 0.15 # meters.
+HAND_LENGTH = util.inches_to_meters(6.5) # meters.
 HAND_STRUGGLE_DURATION = 1 # seconds. 0 to disable
+HAND_START_OPEN = True
 USE_MOCK_ROBOT = False
 ARM_RANGE_LIMIT = 0 #math.pi / 3 # radians. 0 to disable
 ARM_USE_EASING = False # only effective with ARM_RANGE_LIMIT
@@ -47,8 +47,8 @@ def initialize():
             is_dawn_environment = True
         if not is_dawn_environment and not USE_MOCK_ROBOT:
             print("No Robot detected; forcing USE_MOCK_ROBOT.")
-        robot = (mock_robot.MockRobot(debug_logger, {"koalabear": 2, "servocontroller": 0}, 5000)
-            if USE_MOCK_ROBOT or not is_dawn_environment else Robot)
+        robot = (mock_robot.MockRobot(debug_logger, {"koalabear": 2, "servocontroller": 0}, 1,
+            5000) if USE_MOCK_ROBOT or not is_dawn_environment else Robot)
         drive_wheel_left = devices.Wheel(
             debug_logger,
             devices.Motor(robot, debug_logger, "6_5011048539317462848", "a")
@@ -83,13 +83,13 @@ def initialize():
             HAND_OPEN_WIDTH,
             HAND_LENGTH,
             HAND_STRUGGLE_DURATION,
-            True
+            HAND_START_OPEN
             )
         executor = robot_executor.ActionExecutor(debug_logger, robot, DRIVE_WHEEL_SPAN,
             drive_wheel_left, drive_wheel_right, arm, hand)
 def common_main():
     debug_logger.tick()
-    debug_logger.print("TPS: " + str(debug_logger.get_ticks_per_second()))
+    #debug_logger.print("TPS: " + str(debug_logger.get_ticks_per_second()), interval=64000)
 @_PREP_ENTRY_POINT
 def autonomous_setup():
     initialize()
@@ -128,7 +128,6 @@ def drive_turn_teleop_main():
 def arm_teleop_main():
     arm_vel_dir = ((1 if Gamepad.get_value("r_bumper") else 0)
         - (1 if Gamepad.get_value("r_trigger") else 0))
-    debug_logger.print(arm_vel_dir, interval=2000)
     arm_pos = arm.get_normalized_position()
     # 1 / (x^2 - 2x + 5/2) + 1/3
     if ARM_RANGE_LIMIT:

@@ -25,13 +25,14 @@ class MockRobot:
             "servo1": 0.0
         }
     }
-    def __init__(self, debug_logger, max_devices, motor_ticks_per_sec = 2000):
+    def __init__(self, debug_logger, max_devices, logger_interval=2000, motor_ticks_per_sec=2000):
         print("NOTICE: MockRobot instance constructed.")
         self._devices = {}
         self._device_types = {}
         self._max_devices = max_devices
         self._device_counts = {}
         self._debug_logger = debug_logger
+        self._logger_interval = logger_interval
         self._motor_ticks_per_sec = motor_ticks_per_sec
         for device_type in self._default_device_properties:
             self._device_counts[device_type] = 0
@@ -43,7 +44,8 @@ class MockRobot:
         return self._devices[device_id][value_name]
     def set_value(self, device_id, value_name, value):
         self._check_property(device_id, value_name)
-        self._debug_logger.print(f"set:{device_id},{value_name}={str(value)}")
+        self._debug_logger.print(f"set:{device_id},{value_name}={str(value)}",
+            interval=self._logger_interval)
         if self._device_types[device_id] == "koalabear":
             self._update_koalabear(device_id)
         expected_type = type(self._devices[device_id][value_name])
