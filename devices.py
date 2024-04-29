@@ -192,7 +192,7 @@ class Hand:
     _MAX_HISTORY_LENGTH = 40000
     _STRUGGLE_THRESHOLD = 0.02 # meters. hand must move this far in struggle_duration seconds.
     def __init__(self, debug_logger, motor, ticks_per_rotation, max_width, hand_length,
-            struggle_duration, start_open = True):
+            struggle_duration, start_open):
         # disable struggle checking if struggle_duration == 0
         self._debug_logger = debug_logger
         self._motor = motor
@@ -214,10 +214,10 @@ class Hand:
     def toggle_state(self):
         """Swaps the hand's state between open and closed and starts moving accordingly."""
         self._state = not self._state
-        print("about to toggle state")
+        #print("about to toggle state")
         self._motor.set_velocity(self._get_hand_speed() * (1 if self._state else -1))
         self._finished = False
-        print(f"Toggled hand state to {self._state} hand velocity {self._motor.get_velocity()}")
+        #print(f"Toggled hand state to {self._state} hand velocity {self._motor.get_velocity()}")
     def tick(self):
         """Stops the hand's movement if necessary. Returns whether the hand has just finished
         moving."""
@@ -235,17 +235,17 @@ class Hand:
             else:
                 struggling = False
             if reached_end or struggling:
-                print(f"Stopping hand. reached_end = {reached_end} enc = {enc} "
-                    + f"open_enc = {self._open_enc} close_enc = {self._close_enc} "
-                    + f"struggling = {struggling} "
-                    + f"lookbehind width = {self._struggle_duration and lookbehind}")
+                #print(f"Stopping hand. reached_end = {reached_end} enc = {enc} "
+                #    + f"open_enc = {self._open_enc} close_enc = {self._close_enc} "
+                #    + f"struggling = {struggling} "
+                #    + f"lookbehind width = {self._struggle_duration and lookbehind}")
                 self._finished = True
                 self._motor.set_velocity(0)
                 return True
         return False
     def _get_width(self):
         angle = (self._motor.get_encoder() - self._init_enc) / self._ticks_per_rot * 2 * math.pi
-        return math.sin(angle) * self._hand_length * 2
+        return math.sin(angle) * self._hand_length
     def _get_hand_speed(self):
         return 0.5
     def _get_hist_time(self, i):

@@ -13,12 +13,13 @@ HUB_TO_ARM_GEAR_RATIO = 84 / 36
 ARM_MOTOR_RATIO = 70
 ARM_MOTOR_TPR = 16
 ARM_LENGTH = util.inches_to_meters(10.5) # meters.
-HUB_TO_HAND_GEAR_RATIO = 12 / 36
+HUB_TO_HAND_GEAR_RATIO = (48 / 36) * (36 / 12) # 36 to 48 common axle with 12 to 28
 HAND_MOTOR_RATIO = 70
 HAND_MOTOR_TPR = 16
-HAND_OPEN_WIDTH = util.inches_to_meters(6.5) # meters.
+HAND_MAGIC_NUMBER = 1.8 # why.
+HAND_OPEN_WIDTH = 0.15 * HAND_MAGIC_NUMBER # meters.
 HAND_LENGTH = util.inches_to_meters(6.5) # meters.
-HAND_STRUGGLE_DURATION = 1 # seconds. 0 to disable
+HAND_STRUGGLE_DURATION = 3 # seconds. 0 to disable
 HAND_START_OPEN = True
 USE_MOCK_ROBOT = False
 ARM_RANGE_LIMIT = 0 #math.pi / 3 # radians. 0 to disable
@@ -93,14 +94,15 @@ def common_main():
 @_PREP_ENTRY_POINT
 def autonomous_setup():
     initialize()
-    up = False
-    for _ in range(4):
-        executor.linear_move(1)
-        up = not up
-        executor.arm_height((ARM_LENGTH / 2) if up else 0)
-        executor.toggle_hand()
-        executor.turn(-math.pi / 2)
-    executor.linear_move(DRIVE_WHEEL_RADIUS * 2 * math.pi)
+    #up = False
+    #for _ in range(4):
+    #    executor.linear_move(1)
+    #    up = not up
+    #    executor.arm_height((ARM_LENGTH / 2) if up else 0)
+    #    executor.toggle_hand()
+    #    executor.turn(-math.pi / 2)
+    #executor.linear_move(DRIVE_WHEEL_RADIUS * 2 * math.pi)
+    executor.linear_move(0.9)
     executor.halt()
     executor.status()
 @_PREP_ENTRY_POINT

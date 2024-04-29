@@ -1,0 +1,22 @@
+Problems:
+- Hand "struggling" mechanic doesn't actually work and only appears to work because the motors give
+  up themselves.
+- Hand uses a magic number to multiply the maximum width.
+- Arm easing is broken and disabled.
+- Arm bounds checking is broken and disabled.
+- All motors that should be 64 ticks per rev appear to be 16 tpr.
+  - Possible solution: crack a motor open and count the ticks. Becuase how do we not know this
+    already.
+- If the robot disconnects from Dawn, the robot receives garbage and must be powered off.
+  - Possible solution: a kill button that should never be pressed on the
+    gamepad that may be sent if Dawn starts sending garbage.
+- It is difficult to adapt to mechanical changes because the implementations of mechanical devices
+  in code are tightly bound to the code that uses them.
+  - Possible solution: research interface-like design patterns in
+  Python.
+- Everything about coding has to be FASTER.
+
+Todo:
+- Fix problems! (That easy, right?)
+- Better simulator. mock_robot is useful to catch syntax and state errors but gives us no
+  information about the robot's posrot.
