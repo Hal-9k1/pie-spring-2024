@@ -19,7 +19,7 @@ HAND_MOTOR_TPR = 16
 HAND_MAGIC_NUMBER = 1.8 # why.
 HAND_OPEN_WIDTH = 0.15 * HAND_MAGIC_NUMBER # meters.
 HAND_LENGTH = util.inches_to_meters(6.5) # meters.
-HAND_STRUGGLE_DURATION = 3 # seconds. 0 to disable
+HAND_STRUGGLE_DURATION = 0 # seconds. 0 to disable
 HAND_START_OPEN = True
 USE_MOCK_ROBOT = False
 ARM_RANGE_LIMIT = 0 #math.pi / 3 # radians. 0 to disable
@@ -104,7 +104,7 @@ def autonomous_setup():
     #executor.linear_move(DRIVE_WHEEL_RADIUS * 2 * math.pi)
     executor.linear_move(0.9)
     executor.halt()
-    executor.status()
+    #executor.status()
 @_PREP_ENTRY_POINT
 def autonomous_main():
     executor.tick()

@@ -8,12 +8,11 @@ Problems:
   - Possible solution: crack a motor open and count the ticks. Becuase how do we not know this
     already.
 - If the robot disconnects from Dawn, the robot receives garbage and must be powered off.
-  - Possible solution: a kill button that should never be pressed on the
-    gamepad that may be sent if Dawn starts sending garbage.
+  - Possible solution: a kill button that should never be pressed on the gamepad that may be sent
+    if Dawn starts sending garbage.
 - It is difficult to adapt to mechanical changes because the implementations of mechanical devices
   in code are tightly bound to the code that uses them.
-  - Possible solution: research interface-like design patterns in
-  Python.
+  - Possible solution: research interface-like design patterns in Python.
 - Everything about coding has to be FASTER.
 
 Todo:

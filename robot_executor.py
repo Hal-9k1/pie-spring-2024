@@ -11,7 +11,8 @@ class ActionExecutor:
         self._arm = arm
         self._hand = hand
         self._actions = []
-        self.nop()
+        # first action ever executed will not be set up, so queue one that doesn't need it:
+        self.nop() 
     def linear_move(self, dist):
         init_dist = 0
         def linear_move_action(setup):
@@ -22,8 +23,8 @@ class ActionExecutor:
                 self._drive_wheel_right.set_velocity(math.copysign(1, dist))
             else:
                 delta_dist = self._drive_wheel_left.get_distance() - init_dist
-                # slow down to 75% within 0.5m
-                speed = min(1, abs(delta_dist - dist) / 2 + 0.25) 
+                # slow down to 75% within 0.125m
+                speed = min(1, abs(delta_dist - dist) * 2 + 0.75) 
                 self._drive_wheel_left.set_velocity(math.copysign(speed, dist))
                 self._drive_wheel_right.set_velocity(math.copysign(speed, dist))
                 return dist * delta_dist >= 0 and abs(delta_dist) > abs(dist)

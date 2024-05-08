@@ -199,14 +199,14 @@ class Hand:
         self._ticks_per_rot = ticks_per_rotation
         self._hand_length = hand_length
         self._struggle_duration = struggle_duration
-        init_enc = self._motor.get_encoder()
+        self._init_enc = self._motor.get_encoder()
         max_enc = math.asin(max_width / 2 / hand_length) / 2 / math.pi * ticks_per_rotation
         if start_open:
-            self._open_enc = init_enc
-            self._close_enc = init_enc - max_enc
+            self._open_enc = self._init_enc
+            self._close_enc = self._init_enc - max_enc
         else:
-            self._open_enc = init_enc + max_enc
-            self._close_enc = init_enc
+            self._open_enc = self._init_enc + max_enc
+            self._close_enc = self._init_enc
         self._state = start_open
         self._width_history = [0, None] * self._MAX_HISTORY_LENGTH
         self._hist_pos = 0
@@ -215,7 +215,6 @@ class Hand:
         """Swaps the hand's state between open and closed and starts moving accordingly."""
         self._state = not self._state
         #print("about to toggle state")
-        self._motor.set_velocity(self._get_hand_speed() * (1 if self._state else -1))
         self._finished = False
         #print(f"Toggled hand state to {self._state} hand velocity {self._motor.get_velocity()}")
     def tick(self):
@@ -230,24 +229,32 @@ class Hand:
             # don't check if struggle duration is 0
             if self._struggle_duration:
                 lookbehind = self._get_hist_lookbehind()
+                self._debug_logger.print(f"lookbehind: {lookbehind}")
                 struggling = (bool(lookbehind) and abs(lookbehind - self._get_width())
                     < self._STRUGGLE_THRESHOLD)
             else:
                 struggling = False
             if reached_end or struggling:
-                #print(f"Stopping hand. reached_end = {reached_end} enc = {enc} "
-                #    + f"open_enc = {self._open_enc} close_enc = {self._close_enc} "
-                #    + f"struggling = {struggling} "
-                #    + f"lookbehind width = {self._struggle_duration and lookbehind}")
+                print(f"Stopping hand. reached_end = {reached_end} enc = {enc} "
+                    + f"open_enc = {self._open_enc} close_enc = {self._close_enc} "
+                    + f"init_enc = {self._init_enc} "
+                    + f"struggling = {struggling} "
+                    + f"lookbehind width = {self._struggle_duration and lookbehind}")
                 self._finished = True
                 self._motor.set_velocity(0)
                 return True
+            self._record_history()
+            self._motor.set_velocity(self._get_hand_speed() * (1 if self._state else -1))
         return False
     def _get_width(self):
         angle = (self._motor.get_encoder() - self._init_enc) / self._ticks_per_rot * 2 * math.pi
         return math.sin(angle) * self._hand_length
     def _get_hand_speed(self):
-        return 0.5
+        mid = (self._open_enc + self._close_enc) / 2
+        enc = self._motor.get_encoder()
+        # -1 furthest from goal, 0 at midpoint, 1 closest to goal:
+        nearness = 2 * (enc - mid) / mid * (-1 if self._state else 1)
+        return (1 - max(nearness, 0)) * 0.125 + 0.375
     def _get_hist_time(self, i):
         return self._width_history[i * 2]
     def _get_hist_width(self, i):
