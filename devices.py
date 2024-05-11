@@ -191,16 +191,18 @@ class Hand:
     and hand length, optionally stopping when encountering resistance."""
     _MAX_HISTORY_LENGTH = 40000
     _STRUGGLE_THRESHOLD = 0.02 # meters. hand must move this far in struggle_duration seconds.
-    def __init__(self, debug_logger, motor, ticks_per_rotation, max_width, hand_length,
+    def __init__(self, debug_logger, motor, ticks_per_rotation, max_width, hand_offset, hand_length,
             struggle_duration, start_open):
         # disable struggle checking if struggle_duration == 0
         self._debug_logger = debug_logger
         self._motor = motor
         self._ticks_per_rot = ticks_per_rotation
+        self._hand_offset = hand_offset
         self._hand_length = hand_length
         self._struggle_duration = struggle_duration
         self._init_enc = self._motor.get_encoder()
-        max_enc = math.asin(max_width / 2 / hand_length) / 2 / math.pi * ticks_per_rotation
+        max_enc = ((math.asin(max_width / 2 / hand_length) + math.asin(hand_offset / hand_length))
+            / 2 / math.pi * ticks_per_rotation)
         if start_open:
             self._open_enc = self._init_enc
             self._close_enc = self._init_enc - max_enc
@@ -211,6 +213,8 @@ class Hand:
         self._width_history = [0, None] * self._MAX_HISTORY_LENGTH
         self._hist_pos = 0
         self._finished = True
+        print(f"Inititlized hand. open_enc = {self._open_enc} close_enc = {self._close_enc} "
+            + f"init_enc = {self._init_enc}")
     def toggle_state(self):
         """Swaps the hand's state between open and closed and starts moving accordingly."""
         self._state = not self._state

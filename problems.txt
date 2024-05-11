@@ -1,7 +1,11 @@
 Problems:
 - Hand "struggling" mechanic doesn't actually work and only appears to work because the motors give
   up themselves.
+  - SOLVED: ease down hand speed when nearing goal encoder position. This almost completely
+    eliminates overshoot, which fixes things somehow.
 - Hand uses a magic number to multiply the maximum width.
+  - Possible solution: without the magic number, lines drawn from the center of the last gear to the
+    tip of the hand are parallel but not in contact. The code assumes parallel = closed.
 - Arm easing is broken and disabled.
 - Arm bounds checking is broken and disabled.
 - All motors that should be 64 ticks per rev appear to be 16 tpr.
@@ -13,6 +17,7 @@ Problems:
 - It is difficult to adapt to mechanical changes because the implementations of mechanical devices
   in code are tightly bound to the code that uses them.
   - Possible solution: research interface-like design patterns in Python.
+    - Abstract Base Classes? import abc
 - Everything about coding has to be FASTER.
 
 Todo:
